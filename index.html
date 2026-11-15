@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2D Canvas Script-Driven Cloud Render Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #070b14;
+      color: #f8fafc;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    #stage-wrap {
+      position: relative;
+      width: 100vw;
+      height: 56.25vw;
+      max-height: 100vh;
+      max-width: 177.78vh;
+      overflow: hidden;
+      background: #0f172a;
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.85);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    /* Minimal Apple-inspired Floating Script HUD (Auto-hidden in Headless Cloud Render) */
+    #hud-bar {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: opacity 0.25s ease;
+    }
+    .hud-badge {
+      color: #94a3b8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+    .hud-btn {
+      background: #2563eb;
+      color: #ffffff;
+      border: none;
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    .hud-btn:hover {
+      background: #1d4ed8;
+      transform: translateY(-1px);
+    }
+    .hud-btn.secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+    }
+    .hud-btn.secondary:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+    /* Script Drawer Modal */
+    #script-drawer {
+      position: absolute;
+      top: 64px;
+      right: 16px;
+      bottom: 16px;
+      width: min(520px, calc(100vw - 32px));
+      z-index: 30;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 20px;
+      display: none;
+      flex-direction: column;
+      padding: 18px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+    }
+    #script-drawer.open {
+      display: flex;
+    }
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .drawer-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #f8fafc;
+    }
+    .drawer-sub {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+      line-height: 1.45;
+    }
+    #script-editor {
+      flex: 1;
+      width: 100%;
+      background: rgba(2, 6, 23, 0.78);
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 12px;
+      padding: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+    }
+    #script-editor:focus {
+      border-color: #38bdf8;
+    }
+    .drawer-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 12px;
+      gap: 10px;
+    }
+    #status-toast {
+      font-size: 12px;
+      color: #34d399;
+      font-weight: 600;
+    }
+    body.headless #hud-bar,
+    body.headless #script-drawer {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage-wrap">
+    <canvas id="cinema"></canvas>
+
+    <div id="hud-bar">
+      <span class="hud-badge" id="time-readout">00:00.0 / 01:00.0 (Scene 1/10)</span>
+      <button type="button" class="hud-btn secondary" id="btn-restart">Chạy lại từ đầu</button>
+      <button type="button" class="hud-btn" id="btn-toggle-script">Input Script (JSON)</button>
+    </div>
+
+    <div id="script-drawer">
+      <div class="drawer-header">
+        <span class="drawer-title">Input Script (`script.json`)</span>
+        <button type="button" class="hud-btn secondary" id="btn-close-drawer">Đóng</button>
+      </div>
+      <p class="drawer-sub">
+        Chỉnh sửa trực tiếp kịch bản bên dưới (bối cảnh <code>env</code>, nhân vật <code>actors</code>, lời thoại <code>text</code>, hiệu ứng ánh sáng <code>spotlight</code>) hoặc dán vào <code>script.json</code> trên GitHub Actions để tự động tạo TTS &amp; xuất MP4 60FPS.
+      </p>
+      <textarea id="script-editor" spellcheck="false"></textarea>
+      <div class="drawer-footer">
+        <span id="status-toast">Đang chạy kịch bản mặc định (10 cảnh)</span>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="hud-btn secondary" id="btn-copy-script">Copy JSON</button>
+          <button type="button" class="hud-btn" id="btn-apply-script">Áp dụng &amp; Chạy ngay</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================================
+    // DEFAULT INPUT SCRIPT (Can be overridden via script.json or UI Editor)
+    // ============================================================================
+    const DEFAULT_SCRIPT = {
+      title: "Tại Sao Bút Bi Luôn Biến Mất Bí Ẩn?",
+      fps: 60,
+      voice: "vi-VN-NamMinhNeural",
+      scenes: [
+        {
+          duration: 5.0,
+          env: "darkVoid",
+          banner: "BÍ ẨN HỌC ĐƯỜNG",
+          spotlight: { x: 960, color: "56, 189, 248", intensity: 0.85 },
+          text: "Mỗi năm học trôi qua, hàng triệu cây bút bi bốc hơi khỏi mặt bàn mà không để lại dấu vết.",
+          actors: [
+            { type: "pen", x: 960, y: 580, scale: 1.4, mood: "shocked", action: "float" }
+          ]
+        },
+        {
+          duration: 5.0,
+          env: "classroomDay",
+          ribbon: "BI – BÚT BI XANH",
+          spotlight: { x: 360, color: "255, 248, 195", intensity: 0.65 },
+          text: "Xin chào, tôi là Bi. Sáng thứ Hai, tôi còn nằm ngay ngắn trên bàn học mới tinh.",
+          actors: [
+            { type: "pen", x: 960, y: 585, scale: 1.35, mood: "happy", action: "walk", pointRight: true }
+          ]
+        },
+        {
+          duration: 6.0,
+          env: "mintStudio",
+          badges: ["RẺ (5.000đ)", "VIẾT ÊM", "MỰC ĐỀU"],
+          text: "Tôi rẻ, viết êm, mực ra đều. Ai đi học hay đi thi cũng đều cần đến tôi.",
+          actors: [
+            { type: "pen", x: 960, y: 600, scale: 1.45, mood: "proud", handsOnHips: true }
+          ]
+        },
+        {
+          duration: 6.0,
+          env: "gridNotebook",
+          banner: "LƯỢNG MỰC: 85%",
+          text: "Nhưng tuổi thọ của tôi không tính bằng lượng mực... mà tính bằng số lần cho mượn.",
+          actors: [
+            { type: "pen", x: 740, y: 610, scale: 1.35, mood: "shocked", sweating: true },
+            { type: "stickman", x: 1280, y: 560, scale: 1.35, shirtColor: "#3b82f6", action: "reachLeft" }
+          ]
+        },
+        {
+          duration: 6.0,
+          env: "classroomDay",
+          speech: { x: 1180, y: 240, text: "CHO MƯỢN XÍU!" },
+          text: "Chỉ một câu: \"Ê, cho tao mượn cây bút xíu!\"... là số phận tôi rẽ sang trang khác.",
+          actors: [
+            { type: "stickman", x: 420, y: 565, scale: 1.25, shirtColor: "#64748b", blur: 4.5, action: "idle" },
+            { type: "pen", x: 860, y: 605, scale: 1.15, mood: "shocked", sweating: true },
+            { type: "stickman", x: 1320, y: 565, scale: 1.4, shirtColor: "#f97316", facing: -1, action: "wave" }
+          ]
+        },
+        {
+          duration: 6.0,
+          env: "speedVortex",
+          badges: ["TIẾT TOÁN", "TIẾT VĂN", "LỚP KẾ BÊN"],
+          text: "\"Một xíu\" của họ kéo dài từ tiết Toán, qua tiết Văn, rồi bay sang tận lớp bên cạnh.",
+          actors: [
+            { type: "pen", x: 960, y: 540, scale: 1.25, mood: "cry", action: "spinFly" }
+          ]
+        },
+        {
+          duration: 6.0,
+          env: "deskEdge",
+          banner: "TỌT!",
+          text: "Chưa hết! Kẻ thù lớn thứ hai của tôi chính là... trọng lực và khe bàn.",
+          actors: [
+            { type: "pen", x: 960, y: 420, scale: 1.25, mood: "shocked", action: "rollAndFall" }
+          ]
+        },
+        {
+          duration: 6.0,
+          env: "underDeskDark",
+          banner: "HỐ ĐEN GẦM BÀN",
+          spotlight: { x: 880, color: "186, 230, 253", intensity: 0.95 },
+          text: "Chỉ cần lăn nhẹ một vòng, tôi lập tức rơi vào \"hố đen\" gầm bàn đầy bụi.",
+          actors: [
+            { type: "pen", x: 830, y: 635, scale: 1.3, mood: "cry" },
+            { type: "eraser", x: 1130, y: 745, scale: 1.25 }
+          ]
+        },
+        {
+          duration: 6.0,
+          env: "marketStalls",
+          banner: "MUA HỘP MỚI!",
+          text: "Chẳng ai cúi xuống tìm cây bút năm nghìn. Người ta chỉ chậc lưỡi rồi mua luôn hộp mới.",
+          actors: [
+            { type: "stickman", x: 880, y: 575, scale: 1.4, shirtColor: "#2563eb", action: "cheer" },
+            { type: "pen", x: 1540, y: 685, scale: 0.75, mood: "sad" }
+          ]
+        },
+        {
+          duration: 8.0,
+          env: "sunsetField",
+          ribbon: "GIỮ CHẶT TÔI NHÉ!",
+          spotlight: { x: 960, color: "255, 240, 180", intensity: 0.75 },
+          text: "Nên nếu thấy tôi vẫn còn trên bàn... hãy giữ chặt tôi nhé, đừng để tôi đi lạc!",
+          actors: [
+            { type: "pen", x: 780, y: 600, scale: 1.4, mood: "wink", thumbsUp: true },
+            { type: "egg", x: 1180, y: 650, scale: 1.2, mood: "happy", pointRight: true }
+          ]
+        }
+      ]
+    };
+
+    (function () {
+      const canvas = document.getElementById('cinema');
+      const ctx = canvas.getContext('2d');
+      const W = 1920;
+      const H = 1080;
+      canvas.width = W;
+      canvas.height = H;
+
+      const TAU = Math.PI * 2;
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      const lerp = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
+      const invLerp = (a, b, v) => clamp((v - a) / (b - a || 1), 0, 1);
+      const easeOutCubic = (t) => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+      const easeInOutCubic = (t) => {
+        t = clamp(t, 0, 1);
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      };
+      const easeOutBack = (t) => {
+        t = clamp(t, 0, 1);
+        const c1 = 1.70158;
+        const c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+      };
+
+      function seeded(seed) {
+        const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+        return x - Math.floor(x);
+      }
+
+      // OffscreenCanvas Cache for High-Speed Depth-of-Field Blur
+      const dofCache = new Map();
+      function getCachedLayer(key, blurPx, drawFn) {
+        if (dofCache.has(key)) return dofCache.get(key);
+        const off = document.createElement('canvas');
+        off.width = W;
+        off.height = H;
+        const octx = off.getContext('2d');
+        if (blurPx > 0) octx.filter = `blur(${blurPx}px)`;
+        drawFn(octx);
+        dofCache.set(key, off);
+        return off;
+      }
+
+      const bokehParticles = Array.from({ length: 48 }, (_, i) => ({
+        x: seeded(i * 3 + 1) * W,
+        y: seeded(i * 3 + 2) * H,
+        r: 5 + seeded(i * 3 + 3) * 25,
+        depth: seeded(i * 7 + 5),
+        speedX: (seeded(i * 11 + 2) - 0.5) * 24,
+        speedY: -10 - seeded(i * 13 + 4) * 26,
+        phase: seeded(i * 17 + 9) * TAU
+      }));
+
+      // Active Compiled Timeline State
+      let activeScript = null;
+      let compiledScenes = [];
+      let totalDuration = 60.0;
+      let startTimestamp = null;
+      let manualRenderMode = false;
+
+      function compileScript(scriptObj) {
+        activeScript = scriptObj;
+        let cursor = 0;
+        compiledScenes = (scriptObj.scenes || []).map((sc, idx) => {
+          const dur = Number(sc.duration) || 5.0;
+          const s = sc.s !== undefined ? Number(sc.s) : cursor;
+          const e = sc.e !== undefined ? Number(sc.e) : s + dur;
+          cursor = e;
+          return { ...sc, index: idx, s, e, duration: e - s };
+        });
+        totalDuration = cursor > 0 ? cursor : 60.0;
+      }
+
+      compileScript(DEFAULT_SCRIPT);
+
+      // UI Controls Setup
+      const editorEl = document.getElementById('script-editor');
+      const drawerEl = document.getElementById('script-drawer');
+      const toastEl = document.getElementById('status-toast');
+      const readoutEl = document.getElementById('time-readout');
+
+      editorEl.value = JSON.stringify(DEFAULT_SCRIPT, null, 2);
+
+      document.getElementById('btn-toggle-script').addEventListener('click', () => {
+        drawerEl.classList.toggle('open');
+      });
+      document.getElementById('btn-close-drawer').addEventListener('click', () => {
+        drawerEl.classList.remove('open');
+      });
+      document.getElementById('btn-restart').addEventListener('click', () => {
+        startTimestamp = performance.now();
+      });
+      document.getElementById('btn-copy-script').addEventListener('click', () => {
+        editorEl.select();
+        document.execCommand('copy');
+        toastEl.textContent = 'Đã copy JSON vào bộ nhớ tạm!';
+      });
+      document.getElementById('btn-apply-script').addEventListener('click', () => {
+        try {
+          const parsed = JSON.parse(editorEl.value);
+          compileScript(parsed);
+          startTimestamp = performance.now();
+          toastEl.style.color = '#34d399';
+          toastEl.textContent = `Đã nạp ${compiledScenes.length} cảnh (${totalDuration.toFixed(1)}s)!`;
+        } catch (err) {
+          toastEl.style.color = '#f87171';
+          toastEl.textContent = 'Lỗi cú pháp JSON: ' + err.message;
+        }
+      });
+
+      // ============================================================================
+      // LIGHTING & POST-PROCESS RENDERERS
+      // ============================================================================
+      function drawVolumetricSpotlight(xTop, yTop, topW, bottomW, height, colorRGB, intensity, time) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        const grad = ctx.createLinearGradient(xTop, yTop, xTop, yTop + height);
+        grad.addColorStop(0, `rgba(${colorRGB}, ${0.5 * intensity})`);
+        grad.addColorStop(0.6, `rgba(${colorRGB}, ${0.22 * intensity})`);
+        grad.addColorStop(1, `rgba(${colorRGB}, 0)`);
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(xTop - topW / 2, yTop);
+        ctx.lineTo(xTop + topW / 2, yTop);
+        ctx.lineTo(xTop + bottomW / 2, yTop + height);
+        ctx.lineTo(xTop - bottomW / 2, yTop + height);
+        ctx.closePath();
+        ctx.fill();
+
+        for (let i = 0; i < 14; i++) {
+          const prog = (seeded(i * 19 + 3) + time * 0.07 * (0.5 + seeded(i * 5))) % 1;
+          const py = yTop + prog * height * 0.9;
+          const spread = lerp(topW * 0.35, bottomW * 0.44, prog);
+          const px = xTop + Math.sin(time * 1.3 + i * 2.1) * spread * 0.85;
+          const r = 2 + seeded(i * 23) * 4.5;
+          const alpha = Math.sin(prog * Math.PI) * 0.65 * intensity;
+          ctx.fillStyle = `rgba(255, 252, 230, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(px, py, r, 0, TAU);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawAmbientBokeh(time, colorRGB, density = 0.6) {
+        const count = Math.floor(bokehParticles.length * density);
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        for (let i = 0; i < count; i++) {
+          const p = bokehParticles[i];
+          const px = (p.x + p.speedX * time + Math.sin(time * 0.8 + p.phase) * 20 + W * 10) % W;
+          const py = (p.y + p.speedY * time + H * 10) % H;
+          const focalDist = Math.abs(p.depth - 0.45);
+          const rad = p.r * (0.6 + p.depth * 1.1) + focalDist * 12;
+          const alpha = (0.07 + (1 - focalDist) * 0.14) * (0.65 + 0.35 * Math.sin(time * 2.2 + p.phase));
+
+          const g = ctx.createRadialGradient(px, py, 0, px, py, rad);
+          g.addColorStop(0, `rgba(${colorRGB}, ${alpha})`);
+          g.addColorStop(0.6, `rgba(${colorRGB}, ${alpha * 0.4})`);
+          g.addColorStop(1, `rgba(${colorRGB}, 0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(px, py, rad, 0, TAU);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawVignette(strength = 0.28) {
+        ctx.save();
+        const vg = ctx.createRadialGradient(W / 2, H / 2, W * 0.34, W / 2, H / 2, W * 0.64);
+        vg.addColorStop(0, 'rgba(0,0,0,0)');
+        vg.addColorStop(1, `rgba(4, 8, 18, ${strength})`);
+        ctx.fillStyle = vg;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+      }
+
+      function drawShadow(x, y, rx, ry, alpha = 0.24) {
+        ctx.save();
+        const g = ctx.createRadialGradient(x, y, 2, x, y, rx);
+        g.addColorStop(0, `rgba(15, 23, 42, ${alpha})`);
+        g.addColorStop(1, 'rgba(15, 23, 42, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // ============================================================================
+      // ENVIRONMENT PRESET LIBRARY
+      // ============================================================================
+      function renderEnvironment(envName, lt, time) {
+        if (envName === 'darkVoid' || envName === 'underDeskDark') {
+          const bg = ctx.createRadialGradient(W / 2, H / 2, 60, W / 2, H / 2, W * 0.65);
+          bg.addColorStop(0, '#172554');
+          bg.addColorStop(1, '#090d16');
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(0, 790, W, H - 790);
+          drawAmbientBokeh(time, '147, 197, 253', 0.85);
+        } else if (envName === 'classroomDay') {
+          const layer = getCachedLayer('env_classroom', 3.5, (octx) => {
+            octx.fillStyle = '#fef3c7';
+            octx.fillRect(0, 0, W, H);
+            octx.fillStyle = '#bae6fd';
+            octx.strokeStyle = '#111827';
+            octx.lineWidth = 5;
+            octx.fillRect(160, 90, 380, 320);
+            octx.strokeRect(160, 90, 380, 320);
+            octx.fillStyle = '#d97706';
+            octx.fillRect(1420, 140, 340, 480);
+            octx.strokeRect(1420, 140, 340, 480);
+          });
+          ctx.drawImage(layer, 0, 0);
+          ctx.fillStyle = '#d99b52';
+          ctx.strokeStyle = '#111827';
+          ctx.lineWidth = 4.5;
+          ctx.fillRect(0, 765, W, H - 765);
+          ctx.strokeRect(0, 765, W, H - 765);
+        } else if (envName === 'mintStudio') {
+          const bg = ctx.createRadialGradient(W / 2, H / 2, 90, W / 2, H / 2, W * 0.65);
+          bg.addColorStop(0, '#ecfdf5');
+          bg.addColorStop(1, '#6ee7b7');
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = '#34d399';
+          ctx.fillRect(0, 790, W, H - 790);
+          ctx.strokeStyle = '#111827';
+          ctx.lineWidth = 4.5;
+          ctx.beginPath(); ctx.moveTo(0, 790); ctx.lineTo(W, 790); ctx.stroke();
+        } else if (envName === 'gridNotebook') {
+          const layer = getCachedLayer('env_grid', 1.5, (octx) => {
+            octx.fillStyle = '#f8fafc';
+            octx.fillRect(0, 0, W, H);
+            octx.strokeStyle = 'rgba(148, 163, 184, 0.32)';
+            octx.lineWidth = 2;
+            for (let x = 0; x < W; x += 64) { octx.beginPath(); octx.moveTo(x, 0); octx.lineTo(x, H); octx.stroke(); }
+            for (let y = 0; y < H; y += 64) { octx.beginPath(); octx.moveTo(0, y); octx.lineTo(W, y); octx.stroke(); }
+          });
+          ctx.drawImage(layer, 0, 0);
+          ctx.fillStyle = '#cbd5e1';
+          ctx.fillRect(0, 790, W, H - 790);
+          ctx.strokeStyle = '#111827';
+          ctx.lineWidth = 4.5;
+          ctx.beginPath(); ctx.moveTo(0, 790); ctx.lineTo(W, 790); ctx.stroke();
+        } else if (envName === 'speedVortex') {
+          const bg = ctx.createLinearGradient(0, 0, W, H);
+          bg.addColorStop(0, '#c4b5fd');
+          bg.addColorStop(1, '#93c5fd');
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, W, H);
+          ctx.strokeStyle = 'rgba(255,255,255,0.48)';
+          ctx.lineWidth = 4;
+          for (let i = 0; i < 14; i++) {
+            const ly = 110 + i * 68;
+            const lx = ((time * 900 + i * 240) % (W + 400)) - 200;
+            ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx - 220, ly); ctx.stroke();
+          }
+        } else if (envName === 'deskEdge') {
+          const bg = ctx.createLinearGradient(0, 0, 0, H);
+          bg.addColorStop(0, '#fde68a');
+          bg.addColorStop(0.55, '#d97706');
+          bg.addColorStop(1, '#090d16');
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = '#b4692c';
+          ctx.strokeStyle = '#111827';
+          ctx.lineWidth = 5;
+          ctx.fillRect(0, 520, 1120, 65);
+          ctx.strokeRect(0, 520, 1120, 65);
+        } else if (envName === 'marketStalls') {
+          const layer = getCachedLayer('env_market', 2.5, (octx) => {
+            octx.fillStyle = '#fde6bc';
+            octx.fillRect(0, 0, W, H);
+            const colors = ['#ef4444', '#facc15', '#3b82f6', '#22c55e', '#f97316'];
+            const sw = W / 5;
+            for (let i = 0; i < 5; i++) {
+              const sx = i * sw;
+              octx.fillStyle = colors[i];
+              octx.strokeStyle = '#111827';
+              octx.lineWidth = 4;
+              octx.fillRect(sx, 160, sw, 95);
+              octx.strokeRect(sx, 160, sw, 95);
+            }
+          });
+          ctx.drawImage(layer, 0, 0);
+          ctx.fillStyle = '#d6bc94';
+          ctx.fillRect(0, 780, W, H - 780);
+          ctx.strokeStyle = '#111827';
+          ctx.lineWidth = 4.5;
+          ctx.beginPath(); ctx.moveTo(0, 780); ctx.lineTo(W, 780); ctx.stroke();
+        } else {
+          // sunsetField default
+          const sky = ctx.createLinearGradient(0, 0, 0, H);
+          sky.addColorStop(0, '#f59e0b');
+          sky.addColorStop(0.55, '#fde047');
+          sky.addColorStop(1, '#fef9c3');
+          ctx.fillStyle = sky;
+          ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = '#4ade80';
+          ctx.fillRect(0, 780, W, H - 780);
+          ctx.strokeStyle = '#111827';
+          ctx.lineWidth = 4.5;
+          ctx.beginPath(); ctx.moveTo(0, 780); ctx.lineTo(W, 780); ctx.stroke();
+        }
+      }
+
+      // ============================================================================
+      // ACTOR RENDERERS (6-Part Stickman Rig, Pen Rig, Egg Rig, Eraser Rig)
+      // ============================================================================
+      function drawStickman6Part(actor, lt, time) {
+        const {
+          x = W / 2,
+          y = 580,
+          scale = 1.3,
+          facing = 1,
+          action = 'idle',
+          blur = 0
+        } = actor;
+
+        ctx.save();
+        if (blur > 0) ctx.filter = `blur(${blur}px)`;
+
+        const isWalking = action === 'walk';
+        const walkPhase = isWalking ? time * 8 : 0;
+        const bounce = isWalking ? Math.abs(Math.sin(walkPhase)) * 10 * scale : Math.sin(time * 3) * 3 * scale;
+
+        drawShadow(x, y + 150 * scale, 46 * scale, 12 * scale, 0.22);
+
+        ctx.translate(x, y - bounce);
+        ctx.scale(facing * scale, scale);
+        ctx.strokeStyle = '#111827';
+        ctx.lineWidth = 5.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Strict 6-Part Stickman Rig:
+        // Shoulder S = (0, -35), Hip H = (0, 55), Head Center = (0, -82)
+        const Sx = 0, Sy = -35;
+        const Hx = 0, Hy = 55;
+
+        // 1. Torso Line (S -> H)
+        ctx.beginPath();
+        ctx.moveTo(Sx, Sy);
+        ctx.lineTo(Hx, Hy);
+        ctx.stroke();
+
+        // 2 & 3. Two Straight Leg Lines anchored at Hip H (Pendulum kinematics)
+        const legSwing = isWalking ? Math.sin(walkPhase) * 28 : 0;
+        ctx.beginPath();
+        ctx.moveTo(Hx, Hy);
+        ctx.lineTo(-22 + legSwing, 150);
+        ctx.moveTo(Hx, Hy);
+        ctx.lineTo(22 - legSwing, 150);
+        ctx.stroke();
+
+        // 4 & 5. Two Straight Arm Lines anchored at Shoulder S
+        let lArmX = -32, lArmY = 30;
+        let rArmX = 32, rArmY = 30;
+        if (action === 'wave') {
+          rArmX = 48;
+          rArmY = -75 + Math.sin(time * 10) * 18;
+        } else if (action === 'reachLeft') {
+          lArmX = -85;
+          lArmY = -10 + Math.sin(time * 6) * 8;
+        } else if (action === 'cheer') {
+          lArmX = -45; lArmY = -85;
+          rArmX = 45; rArmY = -85;
+        }
+        ctx.beginPath();
+        ctx.moveTo(Sx, Sy);
+        ctx.lineTo(lArmX, lArmY);
+        ctx.moveTo(Sx, Sy);
+        ctx.lineTo(rArmX, rArmY);
+        ctx.stroke();
+
+        // 6. Circular Head with Eyes
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(0, -82, 42, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#111827';
+        ctx.beginPath();
+        ctx.arc(8, -84, 5.5, 0, TAU);
+        ctx.arc(24, -84, 5.5, 0, TAU);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(15, -68, 10, 0.15 * Math.PI, 0.85 * Math.PI);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      function drawPenActor(actor, lt, time) {
+        let ax = actor.x ?? W / 2;
+        let ay = actor.y ?? 580;
+        let tilt = actor.tilt ?? 0;
+        const action = actor.action || 'idle';
+
+        if (action === 'float') {
+          ay += Math.sin(time * 3) * 18;
+        } else if (action === 'spinFly') {
+          ax = lerp(340, 1580, (lt % 3.0) / 3.0);
+          ay += Math.sin(time * 10) * 32;
+          tilt = time * 4.5;
+        } else if (action === 'rollAndFall') {
+          const rollT = clamp(lt / 2.2, 0, 1);
+          const fallT = clamp((lt - 2.2) / 1.8, 0, 1);
+          ax = rollT < 1 ? lerp(360, 1140, easeInOutCubic(rollT)) : 1140 + fallT * 85;
+          ay = rollT < 1 ? 430 : lerp(430, 960, fallT * fallT);
+          tilt = rollT * TAU + fallT * 1.8;
+        }
+
+        const scale = actor.scale ?? 1.3;
+        const bodyW = 70 * scale;
+        const bodyH = 240 * scale;
+
+        drawShadow(ax, ay + bodyH * 0.68, bodyW * 0.9, 14 * scale, 0.25);
+
+        ctx.save();
+        ctx.translate(ax, ay);
+        ctx.rotate(tilt);
+
+        // Legs
+        const legLen = 42 * scale;
+        const lSwing = action === 'walk' ? Math.sin(time * 8) * 0.45 : 0;
+        ctx.strokeStyle = '#111827';
+        ctx.lineWidth = 5 * scale;
+        ctx.lineCap = 'round';
+        [-1, 1].forEach((side) => {
+          ctx.save();
+          ctx.translate(side * bodyW * 0.28, bodyH * 0.48);
+          ctx.rotate(side * lSwing);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(0, legLen);
+          ctx.lineTo(side * 15 * scale, legLen);
+          ctx.stroke();
+          ctx.restore();
+        });
+
+        // Cap & Barrel
+        ctx.fillStyle = '#1d4ed8';
+        ctx.beginPath();
+        ctx.roundRect(-bodyW * 0.34, -bodyH * 0.6, bodyW * 0.68, bodyH * 0.15, 10 * scale);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#dbeafe';
+        ctx.beginPath();
+        ctx.roundRect(-bodyW / 2, -bodyH * 0.46, bodyW, bodyH * 0.76, 15 * scale);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#1e40af';
+        ctx.fillRect(-bodyW * 0.13, -bodyH * 0.32, bodyW * 0.26, bodyH * 0.56);
+
+        ctx.fillStyle = '#2563eb';
+        ctx.fillRect(-bodyW / 2, bodyH * 0.1, bodyW, bodyH * 0.16);
+        ctx.strokeRect(-bodyW / 2, bodyH * 0.1, bodyW, bodyH * 0.16);
+
+        // Cone & Tip
+        ctx.fillStyle = '#e2e8f0';
+        ctx.beginPath();
+        ctx.moveTo(-bodyW * 0.45, bodyH * 0.3);
+        ctx.lineTo(bodyW * 0.45, bodyH * 0.3);
+        ctx.lineTo(bodyW * 0.14, bodyH * 0.5);
+        ctx.lineTo(-bodyW * 0.14, bodyH * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Eyes
+        const eyeY = -bodyH * 0.15;
+        [-1, 1].forEach((side) => {
+          const ex = side * bodyW * 0.24;
+          if (actor.mood === 'wink' && side === 1) {
+            ctx.beginPath();
+            ctx.arc(ex, eyeY, 12 * scale, Math.PI * 1.1, Math.PI * 1.9);
+            ctx.stroke();
+          } else {
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(ex, eyeY, 14 * scale, 19 * scale, 0, 0, TAU);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#111827';
+            ctx.beginPath();
+            ctx.arc(ex, eyeY, (actor.mood === 'shocked' ? 5 : 8) * scale, 0, TAU);
+            ctx.fill();
+          }
+        });
+
+        // Arms
+        ctx.beginPath();
+        ctx.moveTo(-bodyW * 0.5, 0);
+        ctx.lineTo(-bodyW * 0.95, 22 * scale);
+        ctx.moveTo(bodyW * 0.5, 0);
+        ctx.lineTo(bodyW * 0.95, (actor.pointRight || actor.thumbsUp ? -24 : 22) * scale);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      function drawEggActor(actor, lt, time) {
+        const x = actor.x ?? W / 2;
+        const y = actor.y ?? 640;
+        const scale = actor.scale ?? 1.25;
+        const rx = 78 * scale;
+        const ry = 104 * scale;
+
+        drawShadow(x, y + ry * 1.15, rx * 0.9, 14 * scale, 0.24);
+        ctx.save();
+        ctx.translate(x, y + Math.sin(time * 3.4) * 5);
+        ctx.strokeStyle = '#111827';
+        ctx.lineWidth = 4.8 * scale;
+
+        // Legs
+        ctx.beginPath();
+        ctx.moveTo(-rx * 0.35, ry * 0.85); ctx.lineTo(-rx * 0.35, ry * 1.15);
+        ctx.moveTo(rx * 0.35, ry * 0.85); ctx.lineTo(rx * 0.35, ry * 1.15);
+        ctx.stroke();
+
+        // Egg shell
+        ctx.fillStyle = '#f8fafc';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx, ry, 0, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+
+        // Eyes & Smile
+        [-1, 1].forEach((side) => {
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.ellipse(side * rx * 0.28, -ry * 0.12, 16 * scale, 22 * scale, 0, 0, TAU);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#111827';
+          ctx.beginPath();
+          ctx.arc(side * rx * 0.28, -ry * 0.12, 8 * scale, 0, TAU);
+          ctx.fill();
+        });
+        ctx.beginPath();
+        ctx.arc(0, ry * 0.18, 16 * scale, 0.15 * Math.PI, 0.85 * Math.PI);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawEraserActor(actor, time) {
+        const x = actor.x ?? W / 2;
+        const y = actor.y ?? 740;
+        const scale = actor.scale ?? 1.2;
+        drawShadow(x, y + 48 * scale, 50 * scale, 11 * scale, 0.24);
+        ctx.save();
+        ctx.translate(x, y + Math.sin(time * 3) * 3);
+        ctx.scale(scale, scale);
+        ctx.strokeStyle = '#111827';
+        ctx.lineWidth = 4.2;
+        ctx.fillStyle = '#f8fafc';
+        ctx.beginPath(); ctx.roundRect(-48, -36, 96, 72, 12); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#2563eb';
+        ctx.fillRect(-48, 0, 96, 36); ctx.strokeRect(-48, 0, 96, 36);
+        ctx.restore();
+      }
+
+      function drawBannerText(text, x, y, size, fillColor, strokeColor = '#111827', scale = 1, tilt = 0) {
+        if (!text || scale <= 0.01) return;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(tilt);
+        ctx.scale(scale, scale);
+        ctx.font = `900 ${size}px 'Be Vietnam Pro', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = strokeColor;
+        for (let d = 6; d >= 1; d--) ctx.fillText(text, d * 0.8, d * 1.1);
+        ctx.lineWidth = Math.max(6, size * 0.16);
+        ctx.strokeStyle = strokeColor;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(text, 0, 0);
+        ctx.fillStyle = fillColor;
+        ctx.fillText(text, 0, 0);
+        ctx.restore();
+      }
+
+      function drawRibbonBanner(text, x, y, bgColor = '#1d4ed8', scale = 1) {
+        if (!text || scale <= 0.01) return;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scale, scale);
+        ctx.font = `800 38px 'Be Vietnam Pro', sans-serif`;
+        const tw = ctx.measureText(text).width;
+        const w = tw + 90;
+        const h = 68;
+        ctx.strokeStyle = '#111827';
+        ctx.lineWidth = 4.5;
+        ctx.fillStyle = bgColor;
+        ctx.beginPath();
+        ctx.roundRect(-w / 2, -h / 2, w, h, 10);
+        ctx.fill();
+        ctx.stroke();
+        drawBannerText(text, 0, 2, 36, '#ffffff', '#111827');
+        ctx.restore();
+      }
+
+      function drawSubtitleText(text, lt, dur) {
+        if (!text) return;
+        const fadeIn = clamp(lt / 0.15, 0, 1);
+        const fadeOut = clamp((dur - lt) / 0.15, 0, 1);
+        const alpha = Math.min(fadeIn, fadeOut);
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = `800 42px 'Be Vietnam Pro', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const y = H - 86 + (1 - fadeIn) * 8;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 4;
+        ctx.strokeStyle = '#090d16';
+        ctx.lineWidth = 11;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(text, W / 2, y);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(text, W / 2, y);
+        ctx.restore();
+      }
+
+      // ============================================================================
+      // MASTER SCENE EVALUATOR
+      // ============================================================================
+      function drawAtTime(elapsed) {
+        const t = ((elapsed % totalDuration) + totalDuration) % totalDuration;
+        ctx.clearRect(0, 0, W, H);
+
+        const active = compiledScenes.find((sc) => t >= sc.s && t < sc.e) || compiledScenes[0];
+        if (!active) return;
+
+        const lt = t - active.s;
+        const dur = active.duration;
+
+        if (!manualRenderMode && readoutEl) {
+          readoutEl.textContent = `${t.toFixed(1).padStart(4, '0')}s / ${totalDuration.toFixed(1)}s (Cảnh ${active.index + 1}/${compiledScenes.length})`;
+        }
+
+        const pushScale = 1 + (lt / dur) * 0.025;
+        ctx.save();
+        ctx.translate(W / 2, H / 2);
+        ctx.scale(pushScale, pushScale);
+        ctx.translate(-W / 2, -H / 2);
+
+        // 1. Environment
+        renderEnvironment(active.env, lt, t);
+
+        // 2. Volumetric Spotlight (if configured in scene script)
+        if (active.spotlight) {
+          drawVolumetricSpotlight(
+            active.spotlight.x ?? W / 2,
+            -20,
+            180,
+            780,
+            840,
+            active.spotlight.color || '255, 248, 200',
+            active.spotlight.intensity ?? 0.8,
+            t
+          );
+        }
+
+        // 3. Actors
+        (active.actors || []).forEach((actor) => {
+          if (actor.type === 'stickman') drawStickman6Part(actor, lt, t);
+          else if (actor.type === 'egg') drawEggActor(actor, lt, t);
+          else if (actor.type === 'eraser') drawEraserActor(actor, t);
+          else drawPenActor(actor, lt, t);
+        });
+
+        // 4. Ribbons, Banners, Badges & Speech Bubbles
+        if (active.ribbon) {
+          drawRibbonBanner(active.ribbon, W / 2, 155, '#1d4ed8', easeOutBack(lt / 0.45));
+        }
+        if (active.banner) {
+          drawBannerText(active.banner, W / 2, 175, 74, '#facc15', '#111827', easeOutBack(lt / 0.45));
+        }
+        if (Array.isArray(active.badges)) {
+          const xs = [420, 960, 1500];
+          const colors = ['#facc15', '#38bdf8', '#f472b6'];
+          active.badges.forEach((bText, i) => {
+            const delay = 0.25 + i * 0.45;
+            if (lt > delay) {
+              drawBannerText(bText, xs[i % 3], 250 + (i === 1 ? -65 : 40), 56, colors[i % 3], '#111827', easeOutBack((lt - delay) / 0.4));
+            }
+          });
+        }
+        if (active.speech) {
+          const spScale = easeOutBack(lt / 0.45);
+          ctx.save();
+          ctx.translate(active.speech.x ?? 1180, active.speech.y ?? 240);
+          ctx.scale(spScale, spScale);
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#111827';
+          ctx.lineWidth = 4.5;
+          ctx.beginPath(); ctx.ellipse(0, 0, 240, 68, 0, 0, TAU); ctx.fill(); ctx.stroke();
+          drawBannerText(active.speech.text, 0, 4, 40, '#ea580c', '#111827');
+          ctx.restore();
+        }
+
+        ctx.restore();
+
+        drawVignette(0.28);
+        drawSubtitleText(active.text, lt, dur);
+      }
+
+      // ============================================================================
+      // HEADLESS CLOUD RENDER HOOKS (Called by Playwright in GitHub Actions)
+      // ============================================================================
+      window.loadScript = function (scriptData) {
+        document.body.classList.add('headless');
+        compileScript(scriptData);
+        return totalDuration;
+      };
+
+      window.renderFrameAt = function (timeInSeconds) {
+        manualRenderMode = true;
+        document.body.classList.add('headless');
+        drawAtTime(timeInSeconds);
+      };
+
+      function loop(timestamp) {
+        if (manualRenderMode) return;
+        if (!startTimestamp) startTimestamp = timestamp;
+        const elapsed = (timestamp - startTimestamp) / 1000;
+        drawAtTime(elapsed);
+        requestAnimationFrame(loop);
+      }
+
+      window.onload = function () {
+        requestAnimationFrame(loop);
+      };
+    })();
+  </script>
+</body>
+</html>

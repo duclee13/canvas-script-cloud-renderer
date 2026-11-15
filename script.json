@@ -1,0 +1,97 @@
+{
+  "title": "Tại Sao Bút Bi Luôn Biến Mất Bí Ẩn?",
+  "fps": 60,
+  "voice": "vi-VN-NamMinhNeural",
+  "scenes": [
+    {
+      "env": "darkVoid",
+      "banner": "BÍ ẨN HỌC ĐƯỜNG",
+      "spotlight": { "x": 960, "color": "56, 189, 248", "intensity": 0.85 },
+      "text": "Mỗi năm học trôi qua, hàng triệu cây bút bi bốc hơi khỏi mặt bàn mà không để lại dấu vết.",
+      "actors": [
+        { "type": "pen", "x": 960, "y": 580, "scale": 1.4, "mood": "shocked", "action": "float" }
+      ]
+    },
+    {
+      "env": "classroomDay",
+      "ribbon": "BI – BÚT BI XANH",
+      "spotlight": { "x": 360, "color": "255, 248, 195", "intensity": 0.65 },
+      "text": "Xin chào, tôi là Bi. Sáng thứ Hai, tôi còn nằm ngay ngắn trên bàn học mới tinh.",
+      "actors": [
+        { "type": "pen", "x": 960, "y": 585, "scale": 1.35, "mood": "happy", "action": "walk", "pointRight": true }
+      ]
+    },
+    {
+      "env": "mintStudio",
+      "badges": ["RẺ (5.000đ)", "VIẾT ÊM", "MỰC ĐỀU"],
+      "text": "Tôi rẻ, viết êm, mực ra đều. Ai đi học hay đi thi cũng đều cần đến tôi.",
+      "actors": [
+        { "type": "pen", "x": 960, "y": 600, "scale": 1.45, "mood": "proud", "handsOnHips": true }
+      ]
+    },
+    {
+      "env": "gridNotebook",
+      "banner": "LƯỢNG MỰC: 85%",
+      "text": "Nhưng tuổi thọ của tôi không tính bằng lượng mực, mà tính bằng số lần cho mượn.",
+      "actors": [
+        { "type": "pen", "x": 740, "y": 610, "scale": 1.35, "mood": "shocked", "sweating": true },
+        { "type": "stickman", "x": 1280, "y": 560, "scale": 1.35, "action": "reachLeft" }
+      ]
+    },
+    {
+      "env": "classroomDay",
+      "speech": { "x": 1180, "y": 240, "text": "CHO MƯỢN XÍU!" },
+      "text": "Chỉ một câu: Ê, cho tao mượn cây bút xíu! Là số phận tôi rẽ sang trang khác.",
+      "actors": [
+        { "type": "stickman", "x": 420, "y": 565, "scale": 1.25, "blur": 4.5, "action": "idle" },
+        { "type": "pen", "x": 860, "y": 605, "scale": 1.15, "mood": "shocked", "sweating": true },
+        { "type": "stickman", "x": 1320, "y": 565, "scale": 1.4, "facing": -1, "action": "wave" }
+      ]
+    },
+    {
+      "env": "speedVortex",
+      "badges": ["TIẾT TOÁN", "TIẾT VĂN", "LỚP KẾ BÊN"],
+      "text": "Một xíu của họ kéo dài từ tiết Toán, qua tiết Văn, rồi bay sang tận lớp bên cạnh.",
+      "actors": [
+        { "type": "pen", "x": 960, "y": 540, "scale": 1.25, "mood": "cry", "action": "spinFly" }
+      ]
+    },
+    {
+      "env": "deskEdge",
+      "banner": "TỌT!",
+      "text": "Chưa hết! Kẻ thù lớn thứ hai của tôi chính là trọng lực và khe bàn.",
+      "actors": [
+        { "type": "pen", "x": 960, "y": 420, "scale": 1.25, "mood": "shocked", "action": "rollAndFall" }
+      ]
+    },
+    {
+      "env": "underDeskDark",
+      "banner": "HỐ ĐEN GẦM BÀN",
+      "spotlight": { "x": 880, "color": "186, 230, 253", "intensity": 0.95 },
+      "text": "Chỉ cần lăn nhẹ một vòng, tôi lập tức rơi vào hố đen gầm bàn đầy bụi.",
+      "actors": [
+        { "type": "pen", "x": 830, "y": 635, "scale": 1.3, "mood": "cry" },
+        { "type": "eraser", "x": 1130, "y": 745, "scale": 1.25 }
+      ]
+    },
+    {
+      "env": "marketStalls",
+      "banner": "MUA HỘP MỚI!",
+      "text": "Chẳng ai cúi xuống tìm cây bút năm nghìn. Người ta chỉ chậc lưỡi rồi mua luôn hộp mới.",
+      "actors": [
+        { "type": "stickman", "x": 880, "y": 575, "scale": 1.4, "action": "cheer" },
+        { "type": "pen", "x": 1540, "y": 685, "scale": 0.75, "mood": "sad" }
+      ]
+    },
+    {
+      "env": "sunsetField",
+      "ribbon": "GIỮ CHẶT TÔI NHÉ!",
+      "spotlight": { "x": 960, "color": "255, 240, 180", "intensity": 0.75 },
+      "text": "Nên nếu thấy tôi vẫn còn trên bàn, hãy giữ chặt tôi nhé, đừng để tôi đi lạc!",
+      "actors": [
+        { "type": "pen", "x": 780, "y": 600, "scale": 1.4, "mood": "wink", "thumbsUp": true },
+        { "type": "egg", "x": 1180, "y": 650, "scale": 1.2, "mood": "happy", "pointRight": true }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "canvas-script-cloud-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:tts": "python3 scripts/build_timeline_and_tts.py --input=script.json --out-dir=out",
+    "render:local": "node scripts/render_chunk.mjs --timeline=out/compiled_timeline.json --shard=0 --total-shards=1 --out=out/video_raw.mp4"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

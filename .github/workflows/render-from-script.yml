@@ -1,0 +1,118 @@
+name: Render 2D Video From Input Script (Cloud Matrix)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'script.json'
+      - 'index.html'
+  workflow_dispatch:
+    inputs:
+      custom_script_json:
+        description: 'Dán trực tiếp JSON kịch bản (để trống nếu dùng file script.json trong repo)'
+        required: false
+        default: ''
+      fps:
+        description: 'Số khung hình/giây (FPS)'
+        required: false
+        default: '60'
+
+jobs:
+  compile-and-tts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build Audio (Edge-TTS) & Frame-Accurate Timeline
+        env:
+          RAW_JSON: ${{ inputs.custom_script_json }}
+        run: |
+          pip install edge-tts
+          python3 scripts/build_timeline_and_tts.py --input=script.json --raw-json="$RAW_JSON" --out-dir=out
+
+      - name: Upload Compiled Timeline & Voiceover
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-assets
+          path: |
+            out/compiled_timeline.json
+            out/voiceover.mp3
+
+  render-shards:
+    needs: compile-and-tts
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Download Compiled Timeline
+        uses: actions/download-artifact@v4
+        with:
+          name: compiled-assets
+          path: out
+
+      - name: Render Shard ${{ matrix.shard }}
+        run: |
+          node scripts/render_chunk.mjs \
+            --timeline=out/compiled_timeline.json \
+            --shard=${{ matrix.shard }} \
+            --total-shards=4 \
+            --fps=${{ inputs.fps || 60 }} \
+            --out=out/chunk_${{ matrix.shard }}.mp4
+
+      - name: Upload Video Shard ${{ matrix.shard }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-shard-${{ matrix.shard }}
+          path: out/chunk_${{ matrix.shard }}.mp4
+
+  merge-final-mp4:
+    needs: [compile-and-tts, render-shards]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Compiled Audio
+        uses: actions/download-artifact@v4
+        with:
+          name: compiled-assets
+          path: out
+
+      - name: Download All Video Shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: video-shard-*
+          path: shards
+          merge-multiple: true
+
+      - name: Concat Video Shards & Mux Voiceover Audio
+        run: |
+          for i in 0 1 2 3; do
+            echo "file '$PWD/shards/chunk_${i}.mp4'" >> concat_list.txt
+          done
+          ffmpeg -y -f concat -safe 0 -i concat_list.txt -i out/voiceover.mp3 \
+            -c:v copy -c:a aac -b:a 192k -shortest final_2d_animation_60fps.mp4
+
+      - name: Upload Final Rendered MP4
+        uses: actions/upload-artifact@v4
+        with:
+          name: final_2d_animation_60fps
+          path: final_2d_animation_60fps.mp4
